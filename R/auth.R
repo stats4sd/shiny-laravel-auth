@@ -39,11 +39,23 @@
 #'
 #' @examples
 #' \dontrun{
-#' auth <- laravel_auth(session, on_authenticated = render_authenticated_ui)
-#' observeEvent(auth$user, {
-#'   investment_id <- auth$input$investment_id
-#'   # ...initialise the app...
-#' })
+#' # The static UI ships an empty placeholder; nothing sensitive lives here.
+#' ui <- fluidPage(tags$head(laravel_auth_script()), uiOutput("authenticated_ui"))
+#'
+#' server <- function(input, output, session) {
+#'   # Defined inside the server and rendered only from this callback, so the
+#'   # real UI never reaches an unauthenticated browser.
+#'   render_authenticated_ui <- function() {
+#'     output$authenticated_ui <- renderUI(plotOutput("results"))
+#'   }
+#'
+#'   auth <- laravel_auth(session, on_authenticated = render_authenticated_ui)
+#'
+#'   observeEvent(auth$user, {
+#'     investment_id <- auth$input$investment_id
+#'     # ...initialise the app for investment_id...
+#'   })
+#' }
 #' }
 laravel_auth <- function(session,
                          on_authenticated = NULL,
