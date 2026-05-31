@@ -1,0 +1,22 @@
+Package: shinyLaravelAuth
+Title: Laravel <-> Shiny Authentication Handshake
+Version: 0.1.0
+Authors@R:
+    person("Stats4SD", role = c("aut", "cre"),
+           email = "office@stats4sd.org")
+Description: R-side helpers for authenticating a Shiny app embedded in a
+    Laravel/Filament host via a shared-filesystem + postMessage handshake.
+    Provides the browser-side message handler script and a server-side
+    handshake that registers a private callback URL, advertises it to the
+    Laravel parent, and exposes the authorised user context as reactive
+    values. Mirrors the 'stats4sd/laravel-shiny-loader' Composer package on
+    the R side.
+License: MIT + file LICENSE
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 8.0.0
+Imports:
+    shiny,
+    jsonlite,
+    stringi,
+    stringr
