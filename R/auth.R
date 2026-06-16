@@ -20,18 +20,28 @@
 #' process can create a given `{uuid}` file), browser origin checks on the
 #' Laravel side, and Laravel performing authorisation before it calls back.
 #'
+#' ## Local development override
+#'
+#' Set `OVERRIDE_LARAVEL_AUTH=true` in the Shiny app's `.env` file to bypass
+#' the full handshake entirely. In this mode the function returns immediately
+#' with `auth$user` set to `"override-user"` and `auth$input` populated from
+#' any environment variables whose names start with `AUTH_`. The `AUTH_` prefix
+#' is stripped to produce the key, so `AUTH_project_id=42` becomes
+#' `auth$input$project_id == "42"`. No session file is written and no browser
+#' message is sent.
+#'
 #' @param session The Shiny `session` object.
-#' @param on_authenticated Optional zero-argument function called inside the
-#'   `POST` filter the moment authentication is confirmed — e.g. to swap the
-#'   pre-auth UI for the real UI. Keeps this package UI-agnostic.
+#' @param on_authenticated Optional zero-argument function called the moment
+#'   authentication is confirmed — e.g. to swap the pre-auth UI for the real
+#'   UI. In override mode this is called synchronously before returning.
 #' @param sessions_dir Directory holding the per-session callback files. Must be
 #'   readable/writable by both the Shiny and Laravel processes. Defaults to
-#'   `"../.sessions"`.
+#'   `"../.sessions"`. Ignored in override mode.
 #' @param base_url This Shiny app's externally reachable base URL, prepended to
 #'   the callback path that Laravel will `POST` to. Defaults to the `URL`
-#'   environment variable.
+#'   environment variable. Ignored in override mode.
 #' @param obj_name Name passed to `session$registerDataObj()`; parameterised so
-#'   multiple apps can coexist under one `sessions_dir`.
+#'   multiple apps can coexist under one `sessions_dir`. Ignored in override mode.
 #'
 #' @return A [shiny::reactiveValues] object with `user` and `input` fields,
 #'   populated once Laravel posts back.
@@ -62,6 +72,15 @@ laravel_auth <- function(session,
                          sessions_dir = "../.sessions",
                          base_url = Sys.getenv("URL"),
                          obj_name = "auth") {
+
+  if (isTRUE(as.logical(Sys.getenv("OVERRIDE_LARAVEL_AUTH", "false")))) {
+    auth <- shiny::reactiveValues()
+    auth$input <- get_auth_override_inputs()
+    auth$user  <- "override-user"
+    if (is.function(on_authenticated)) on_authenticated()
+    return(auth)
+  }
+
   auth <- shiny::reactiveValues()
 
   # A POST to this URL means Laravel has authorised the user and is handing
@@ -101,6 +120,13 @@ laravel_auth <- function(session,
   })
 
   auth
+}
+
+get_auth_override_inputs <- function() {
+  env <- Sys.getenv()
+  auth_vars <- env[startsWith(names(env), "AUTH_")]
+  names(auth_vars) <- sub("^AUTH_", "", names(auth_vars))
+  as.list(auth_vars)
 }
 
 #' Parse the body of a JSON POST sent to a registerDataObj URL
