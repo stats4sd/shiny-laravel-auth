@@ -110,7 +110,54 @@ The `sessions_dir` (default `../.sessions`) **must be on a volume both the Shiny
 
 Whatever array the Laravel controller passes to `Http::post($callbackUrl, [...])` arrives in `auth$input` keyed by the same names. Pass **identifiers, never secrets** — authorisation belongs in the Laravel controller, before the callback.
 
+## Local development override
+
+Running the app inside a container that mimics the full Laravel stack just to test a UI change is slow. Set `OVERRIDE_LARAVEL_AUTH=true` in the Shiny app's `.env` to skip the handshake entirely and start the app in an already-authenticated state.
+
+### How it works
+
+When `OVERRIDE_LARAVEL_AUTH=true`, `laravel_auth()` returns immediately — no session file is written, no browser message is sent, and no `POST` callback is needed. `auth$user` is set to `"override-user"` and `auth$input` is populated from any environment variables whose names begin with `AUTH_`. The `AUTH_` prefix is stripped to form the key.
+
+### Example `.env`
+
+If the real Laravel app posts these fields:
+
+```
+project_id
+reg_form_xml_id
+reg_form_enketo_id
+```
+
+Add the following to the Shiny app's `.env`:
+
+```
+OVERRIDE_LARAVEL_AUTH=true
+AUTH_project_id=42
+AUTH_reg_form_xml_id=abc
+AUTH_reg_form_enketo_id=xyz
+```
+
+The app will start as if Laravel had authenticated and passed those values:
+
+```r
+auth$user                    # "override-user"
+auth$input$project_id        # "42"
+auth$input$reg_form_xml_id   # "abc"
+auth$input$reg_form_enketo_id # "xyz"
+```
+
+`on_authenticated()` is still called (synchronously, before `laravel_auth()` returns), so the authenticated UI renders exactly as it would in production.
+
+### Configuration
+
+| Env var | Purpose |
+| --- | --- |
+| `OVERRIDE_LARAVEL_AUTH` | Set to `true` to enable override mode. Any other value (or absent) uses the normal handshake. |
+| `AUTH_<key>` | Value assigned to `auth$input$<key>` in override mode. All values are character strings. |
+
+> **Never commit `.env` to version control**, and never set `OVERRIDE_LARAVEL_AUTH=true` in a production environment — it bypasses all authentication.
+
 ## Notes
 
 - The browser-side origin check lives on the Laravel side (the `<x-shiny-loader::shiny-iframe>` blade component); set `LARAVEL_APP_URL` precisely so messages only go to the trusted host.
-- `auth$user` is a constant placeholder (`"authenticated-user"`): Shiny only learns _that_ a request was authorised, not _who_.
+- `auth$user` is a constant placeholder (`"authenticated-user"` in production, `"override-user"` in override mode): Shiny only learns _that_ a request was authorised, not _who_.
